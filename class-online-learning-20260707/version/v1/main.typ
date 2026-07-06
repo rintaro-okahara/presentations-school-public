@@ -8,6 +8,7 @@
 #let m-dark-teal = rgb("#23373b")
 #let m-light-brown = rgb("#eb811b")
 #let m-lighter-brown = rgb("#d6c6b7")
+#let m-red = rgb("#c7352b")
 
 #let _admonition(kind, accent, name, body) = block(
   width: 100%,
@@ -38,9 +39,18 @@
 }
 
 #let compact(body) = {
-  set text(size: 0.78em)
+  set text(size: 0.86em)
   body
 }
+
+#let spacious(body) = {
+  set text(size: 0.98em)
+  body
+}
+
+#let changed(body) = text(fill: m-red, body)
+#let alg-text-size = 1.1em
+#let alg-row-gutter = 1.08em
 
 // ============================================================
 //  Theme setup
@@ -54,6 +64,7 @@
     author: [Rintaro Okahara],
     date: datetime(year: 2026, month: 7, day: 7),
   ),
+  config-common(new-section-slide-fn: none),
 )
 
 #set heading(numbering: numbly("{1}.", default: "1.1"))
@@ -69,262 +80,419 @@
 #outline(title: none, indent: 1em, depth: 1)
 
 // ============================================================
-//  Problem and setup
+//  1. Problem and motivation
 // ============================================================
-= Problem and Setup
+= Problem and Motivation
 
-== What Should EG Adapt To?
-
-#compact[
-  Standard exponentiated gradient is robust, but its bound can be driven by
-  experts that are irrelevant in hindsight.
-
-  #v(0.5em)
-
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1.1em,
-    [
-      *Classical view*
-      $
-        "Regret" <= (log n) / eta
-          + eta sum_(t=1)^T norm(z_t)_oo^2
-      $
-    ],
-    [
-      *Desired view*
-      $
-        "Regret" <= (log n) / eta
-          + eta dot "complexity of " i^star
-      $
-    ],
-  )
-
-  #v(0.45em)
-
-  Main question: can EG exploit that the *best expert* is easy, even when other
-  experts fluctuate?
-]
-
-== Expert Advice Setting
+== Hedge Algorithm: Protocol and Bound
 
 #compact[
-  #definition("Protocol")[
-    On each round $t=1,dots.c,T$: $w_t in Delta_n$ is played,
-    $z_t in [-1, 1]^n$ is revealed, and the learner pays $w_t^top z_t$.
-  ]
-
-  #v(0.45em)
-
-  Comparator regret:
-  $
-    "Regret"(u)
-      := sum_(t=1)^T w_t^top z_t - sum_(t=1)^T u^top z_t,
-      quad u in Delta_n.
-  $
-
-  For the best expert, take $u=e_(i^star)$.
-]
-
-== Three Notions of "Easy"
-
-#compact[
-  For expert $i$, the paper compares:
-
-  #v(0.35em)
-
-  #grid(
-    columns: (0.9fr, 1.1fr, 1.25fr),
-    column-gutter: 0.8em,
-    row-gutter: 0.42em,
-    align: (left + top, left + top, left + top),
-    [*Second moment*], [$S_i := sum_t z_(t,i)^2$], [small losses],
-    [*Variance*], [$V_i := sum_t (z_(t,i) - overline(z)_i)^2$], [almost constant losses],
-    [*Path length*], [$D_i := sum_t (z_(t,i) - z_(t-1,i))^2$], [predictable from the last round],
-  )
-
-  #v(0.45em)
-
-  Target: depend on $D_(i^star)$, not $D_oo$ or $S_oo$.
-]
-
-// ============================================================
-//  Motivation
-// ============================================================
-= Motivation: Two Useful Tricks
-
-== Two Multiplicative Updates
-
-#compact[
-  Two updates look similar but have different guarantees:
-
-  #v(0.35em)
-
-  #grid(
-    columns: (1fr, 1fr),
-    gutter: 1em,
-    [
-      *EG / MW1*
-      $
-        w_(t+1,i) prop w_(t,i) exp(-eta z_(t,i))
-      $
-      Bound sees a learner-weighted or worst-coordinate scale.
-    ],
-    [
-      *MW2*
-      $
-        w_(t+1,i) prop w_(t,i) (1 - eta z_(t,i))
-      $
-      Bound can see the best expert's second moment.
-    ],
-  )
-
-  #v(0.45em)
-
-  Puzzle: MW2 has the better type of bound, but it is not mirror descent with a
-  fixed regularizer.
-]
-
-== Trick 1: Adaptive Regularization
-
-#compact[
-  Write MW2 in log-weights:
-  $
-    beta_(t+1,i)
-      = beta_(t,i) + log(1 - eta z_(t,i)).
-  $
-
-  #v(0.35em)
-
-  Since
-  $
-    log(1 - x) approx -x - x^2,
-  $
-  MW2 behaves like EG plus a *second-order correction*:
-  $
-    beta_(t+1,i)
-      = beta_(t,i) - eta z_(t,i) - eta^2 z_(t,i)^2.
-  $
-
-  #v(0.35em)
-
-  Coordinates with larger correction terms receive stronger regularization.
-]
-
-== Trick 2: Optimism
-
-#compact[
-  Suppose before seeing $z_t$, we have a hint $m_t$.
-
-  #v(0.35em)
-
-  Optimistic mirror descent predicts from the preemptive update:
-  $
-    w_t = nabla psi^*(theta_t - eta m_t).
-  $
-
-  #v(0.35em)
-
-  Regret depends on the hint error $z_t - m_t$.
-
-  #v(0.35em)
-
-  If $m_t = z_(t-1)$, the error is exactly the path movement
-  $z_t - z_(t-1)$.
-]
-
-// ============================================================
-//  Main result
-// ============================================================
-= Main Result
-
-== Adaptive + Optimistic EG
-
-#compact[
-  Combine the two tricks:
-
-  #v(0.25em)
-
+  #v(-0.4em)
   #block(width: 100%, breakable: false, {
-    set text(size: 0.82em)
+    set text(size: alg-text-size)
     line(length: 100%, stroke: 1pt)
-    v(0.12em)
-    text(weight: "bold", fill: m-light-brown)[AEG with hints]
-    v(0.12em)
+    v(0.1em)
+    text(weight: "bold", fill: m-light-brown)[Algorithm: Hedge]
+    [ — expert advice protocol]
+    v(0.1em)
     line(length: 100%, stroke: 0.5pt)
-    v(0.3em)
+    v(0.28em)
     grid(
       columns: (1.4em, 1fr),
       column-gutter: 0.45em,
-      row-gutter: 0.38em,
-      align: (right + top, left + top),
-      [1:], [Initialize $beta_(1,i) = 0$.],
-      [2:], [Predict $w_(t,i) prop exp(beta_(t,i) - eta m_(t,i))$.],
-      [3:], [Observe $z_t$ and suffer $w_t^top z_t$.],
-      [4:], [Update
-        $beta_(t+1,i) = beta_(t,i) - eta z_(t,i)
-          - eta^2 (z_(t,i) - m_(t,i))^2$.],
+      row-gutter: alg-row-gutter,
+      align: (right + horizon, left + horizon),
+      [1:], [Initialize weights $w_(1,i)=1$ for all $i$.],
+      [2:], [
+        For $t=1,dots.c,T$, form
+        #text(size: 1.08em)[$p_(t,i)=w_(t,i)/(sum_(j=1)^n w_(t,j))$];
+        learner plays $p_t$.
+      ],
+      [3:], [Loss vector $z_t in [-1,1]^n$ is revealed; learner suffers $p_t^top z_t$.],
+      [4:], [
+        For each $i$, update
+        #text(size: 1em)[$w_(t+1,i)=w_(t,i) exp(-eta z_(t,i))$].
+      ],
     )
-    v(0.12em)
+    v(0.1em)
+    line(length: 100%, stroke: 1pt)
+  })
+
+  #v(0.22em)
+
+  *Regret:* for $u in Delta_n$,
+  $R_T(u) := sum_(t=1)^T (p_t - u)^top z_t$.
+
+  #v(0.2em)
+
+  *Standard upper bound.*
+  #align(center)[
+    $R_T(u) <= (log n) / eta
+      + eta sum_(t=1)^T norm(z_t)_oo^2$
+  ]
+]
+
+== Adaptive Weight Update: MW2
+
+#compact[
+  #v(-0.75em)
+  #block(width: 100%, breakable: false, {
+    set text(size: alg-text-size)
+    line(length: 100%, stroke: 1pt)
+    v(0.1em)
+    text(weight: "bold", fill: m-light-brown)[Algorithm: MW2]
+    [ — adaptive weights]
+    v(0.1em)
+    line(length: 100%, stroke: 0.5pt)
+    v(0.28em)
+    grid(
+      columns: (1.4em, 1fr),
+      column-gutter: 0.45em,
+      row-gutter: alg-row-gutter,
+      align: (right + horizon, left + horizon),
+      [1:], [Initialize weights $w_(1,i)=1$ for all $i$.],
+      [2:], [For $t=1,dots.c,T$, form
+        #text(size: 1.08em)[$p_(t,i)=w_(t,i)/(sum_(j=1)^n w_(t,j))$];
+        learner plays $p_t$.],
+      [3:], [Loss vector $z_t in [-1,1]^n$ is revealed; learner suffers $p_t^top z_t$.],
+      [4:], [For each $i$, update
+        $w_(t+1,i)=w_(t,i)$ #changed[$(1 - eta z_(t,i))$].],
+    )
+    v(0.1em)
+    line(length: 100%, stroke: 1pt)
+  })
+
+  #v(0.45em)
+
+  Bound:
+  #align(center)[
+    $"Regret"(u) <= (log n) / eta + eta$
+    #changed[$sum_i u_i sum_t z_(t,i)^2$]
+  ]
+
+  #v(0.25em)
+
+  The second term is now averaged by the comparator $u$.
+]
+
+== Why MW2 Improves the Bound
+
+#spacious[
+  Hedge pays for the worst coordinate on every round:
+
+  #align(center)[
+    $eta sum_t norm(z_t)_oo^2$
+  ]
+
+  #v(0.7em)
+
+  MW2 pays only for the comparator-weighted coordinates:
+
+  #align(center)[
+    #changed[$eta sum_i u_i sum_t z_(t,i)^2$]
+  ]
+
+  #v(0.7em)
+
+  For the best expert $u=e_(i^star)$, this becomes
+  #align(center)[
+    #changed[$eta sum_t z_(t,i^star)^2$]
+  ]
+
+  #v(0.6em)
+
+  Irrelevant noisy experts no longer enlarge the second term.
+]
+
+== Optimistic Learning: Hints
+
+#compact[
+  #v(-0.75em)
+  #block(width: 100%, breakable: false, {
+    set text(size: alg-text-size)
+    line(length: 100%, stroke: 1pt)
+    v(0.1em)
+    text(weight: "bold", fill: m-light-brown)[Algorithm: Optimistic EG]
+    [ — hints]
+    v(0.1em)
+    line(length: 100%, stroke: 0.5pt)
+    v(0.28em)
+    grid(
+      columns: (1.4em, 1fr),
+      column-gutter: 0.45em,
+      row-gutter: alg-row-gutter,
+      align: (right + horizon, left + horizon),
+      [1:], [Initialize scores $theta_(1,i)=0$ for all $i$.],
+      [2:], [For $t=1,dots.c,T$, using hint $m_t$, form
+        #text(size: 1.04em)[
+          $p_(t,i) prop exp(theta_(t,i) #text(fill: m-red)[$-eta m_(t,i)$])$
+        ];
+        learner plays $p_t$.],
+      [3:], [Loss vector $z_t in [-1,1]^n$ is revealed; learner suffers $p_t^top z_t$.],
+      [4:], [For each $i$, update
+        $theta_(t+1,i)=theta_(t,i)-eta z_(t,i)$.],
+    )
+    v(0.1em)
+    line(length: 100%, stroke: 1pt)
+  })
+
+  #v(0.4em)
+
+  Bound:
+  #align(center)[
+    $R_T(u) <= (log n) / eta + eta$
+    #changed[$sum_t norm(z_t - m_t)_oo^2$]
+  ]
+
+  #v(0.25em)
+
+  The second term now measures hint error. With $m_t=z_(t-1)$, this becomes
+  a path-length quantity.
+]
+
+== Two Ways to Improve the Second Term
+
+#spacious[
+  We now have two independent changes to the Hedge template:
+
+  #v(0.65em)
+
+  #grid(
+    columns: (1fr, 1fr),
+    gutter: 1.45em,
+    [
+      *Adaptive weights*
+
+      #v(0.28em)
+
+      Change the weight update.
+
+      #v(0.28em)
+
+      Worst-coordinate scale becomes comparator scale:
+      $
+        sum_i u_i sum_t z_(t,i)^2 .
+      $
+    ],
+    [
+      *Optimism / hints*
+
+      #v(0.28em)
+
+      Change the probability before observing $z_t$.
+
+      #v(0.28em)
+
+      Loss scale becomes hint-error scale:
+      $
+        sum_t norm(z_t - m_t)_oo^2 .
+      $
+    ],
+  )
+
+  #v(0.65em)
+
+  The paper combines both changes in one algorithm.
+]
+
+== Why Improve the Second Term?
+
+#[
+  #set text(size: 0.98em)
+
+  Many refinements keep the first term $(log n)/eta$ and replace the second
+  term by a more local quantity.
+
+  #v(0.75em)
+
+  #{
+    set text(size: 0.98em)
+    grid(
+      columns: (0.5em, 1fr),
+      column-gutter: 0.35em,
+      row-gutter: 1.1em,
+      align: (left + horizon, left + horizon),
+      [•], [*Standard EG:* $sum_(t=1)^T norm(z_t)_oo^2$.],
+      [•], [*Adaptive / MW2:* $sum_(i=1)^n u_i sum_(t=1)^T z_(t,i)^2$.],
+      [•], [*Optimistic methods:* $sum_(t=1)^T norm(z_t - m_t)_oo^2$.],
+      [•], [*This paper:* $sum_(i=1)^n u_i sum_(t=1)^T (z_(t,i) - m_(t,i))^2$.],
+    )
+  }
+
+  #v(0.8em)
+
+  Drawback of $norm(z_t)_oo^2$:
+  it uses the worst coordinate at each round, not the comparator chosen in
+  hindsight.
+
+  #v(0.65em)
+
+  A noisy irrelevant expert can enlarge the bound even when the best expert is
+  stable or predictable.
+]
+
+// ============================================================
+//  2. Paper motivation
+// ============================================================
+= Combining Two Directions
+
+== Paper's Motivation: Combine Them
+
+#spacious[
+  The paper's key move:
+
+  #v(0.55em)
+
+  #align(center)[
+    #text(size: 1.22em, weight: "bold", fill: m-light-brown)[
+      adaptive best-expert scale + optimistic hint error
+    ]
+  ]
+
+  #v(0.85em)
+
+  Desired second term:
+  $
+    sum_t (z_(t,i^star) - m_(t,i^star))^2 .
+  $
+
+  #v(0.75em)
+
+  This yields one algorithm whose guarantee becomes variance or path length
+  after choosing the hint sequence.
+]
+
+// ============================================================
+//  3. Main result
+// ============================================================
+= Main Result
+
+== Algorithm: Adaptive Optimistic EG
+
+#compact[
+  #v(-0.75em)
+  #block(width: 100%, breakable: false, {
+    set text(size: alg-text-size)
+    line(length: 100%, stroke: 1pt)
+    v(0.1em)
+    text(weight: "bold", fill: m-light-brown)[Algorithm: Adaptive Optimistic EG]
+    [ — adaptive weights + hints]
+    v(0.1em)
+    line(length: 100%, stroke: 0.5pt)
+    v(0.28em)
+    grid(
+      columns: (1.4em, 1fr),
+      column-gutter: 0.45em,
+      row-gutter: alg-row-gutter,
+      align: (right + horizon, left + horizon),
+      [1:], [Initialize $beta_(1,i) = 0$.],
+      [2:], [For $t=1,dots.c,T$, using hint $m_t$, form
+        #text(size: 1.04em)[
+          $p_(t,i) prop exp(beta_(t,i) #text(fill: m-red)[$-eta m_(t,i)$])$
+        ];
+        learner plays $p_t$.],
+      [3:], [Loss vector $z_t in [-1,1]^n$ is revealed; learner suffers $p_t^top z_t$.],
+      [4:], [For each $i$, update
+        $beta_(t+1,i)=beta_(t,i)-eta z_(t,i)$
+        #changed[$- eta^2 (z_(t,i)-m_(t,i))^2$].],
+    )
+    v(0.1em)
     line(length: 100%, stroke: 1pt)
   })
 
   #v(0.35em)
 
-  The correction penalizes experts whose hints were inaccurate.
+  The red correction downweights experts whose hints were inaccurate.
 ]
 
-== Generic Bound With Hints
+== Upper Bound
 
-#compact[
+#spacious[
   #theorem("Adaptive Exponentiated Gradient")[
     If $norm(z_t)_oo <= 1$, $norm(m_t)_oo <= 1$, and $0 < eta <= 1/4$, then
     for every $u in Delta_n$,
     $
       "Regret"(u)
         <= (log n) / eta
-          + eta sum_(i=1)^n u_i sum_(t=1)^T
-              (z_(t,i) - m_(t,i))^2.
+          + eta sum_i u_i sum_t (z_(t,i) - m_(t,i))^2 .
     $
   ]
 
-  #v(0.4em)
+  #v(0.8em)
 
-  The comparator $u$ chooses which coordinates matter in the second term.
+  This is exactly the desired combination:
+  the comparator chooses the relevant coordinates,
+  and the hint error chooses the relevant scale.
 ]
 
-== AEG-Path
+== Path-Length Result
 
-#compact[
-  Choose the last loss vector as the hint:
-  $
-    m_t = z_(t-1).
-  $
-
-  #v(0.35em)
-
-  For $u=e_(i^star)$:
+#spacious[
+  Set $m_t = z_(t-1)$ and take $u=e_(i^star)$:
   $
     "Regret"(i^star)
       <= (log n) / eta + eta D_(i^star),
       quad
-      D_i := sum_(t=1)^T (z_(t,i) - z_(t-1,i))^2.
+      D_i := sum_t (z_(t,i) - z_(t-1,i))^2.
   $
 
-  #v(0.35em)
+  #v(0.85em)
 
-  This is the path-length bound Kale asked for: dependence on the *best
-  expert's* path length.
+  This answers Kale's question: can the path-length bound depend on the best
+  expert rather than the worst coordinate?
 ]
 
-== What Improves?
+// ============================================================
+//  4. Hint interpretations
+// ============================================================
+= What the Hints Mean
+
+== Three Choices of Hint
+
+#spacious[
+  The same upper bound has different interpretations:
+
+  #v(0.65em)
+
+  #grid(
+    columns: (1fr, 1fr, 1fr),
+    column-gutter: 0.75em,
+    row-gutter: 0.62em,
+    align: (left + top, left + top, left + top),
+    [*Hint*], [*Error term*], [*Regret scale*],
+    [$m_t = 0$], [$z_t$], [$S_(i^star)$],
+    [$m_t = 1/t sum_(s<t) z_s$], [$z_t - m_t$], [$V_(i^star)$],
+    [$m_t = z_(t-1)$], [$z_t - z_(t-1)$], [$D_(i^star)$],
+  )
+
+  #v(0.75em)
+
+  The paper uses this to unify second-moment, variance, and path-length bounds.
+]
+
+== When Is Regret Small?
+
+#spacious[
+  #show list: set block(spacing: 0.62em)
+
+  - $S_(i^star)$ is small when the best expert's losses are close to zero.
+  - $V_(i^star)$ is small when the best expert's losses are nearly constant.
+  - $D_(i^star)$ is small when the best expert's losses move slowly.
+
+  #v(0.9em)
+
+  The path-length view is strongest when the best expert may have large losses,
+  but those losses are predictable from the previous round.
+]
+
+== Comparison of Bounds
 
 #[
-  #set text(size: 0.74em)
+  #set text(size: 0.94em)
   #grid(
     columns: (1.18fr, 1.03fr, 1.18fr),
     column-gutter: 0.65em,
-    row-gutter: 0.42em,
+    row-gutter: 0.58em,
     align: (left + top, left + top, left + top),
     [*Algorithm*], [*Scale in bound*], [*What it misses*],
     [EG / Hedge], [$S_oo$], [best expert may be easy],
@@ -334,157 +502,90 @@
     [*AEG-Path*], [$D_(i^star)$], [best expert only],
   )
 
-  #v(0.35em)
+  #v(0.75em)
 
-  The difference can be order $T$: even when $D_(i^star)=Theta(1)$,
-  $max_i D_i$ and $V_(i^star)$ can be $Theta(T)$.
+  Even if $D_(i^star)=Theta(1)$, the other scales can be $Theta(T)$.
 ]
 
 // ============================================================
-//  Key idea
+//  5. Proof tools and extensions
 // ============================================================
-= Key Idea
+= Proof Tools and Extensions
 
-== Push Regret Into the Regularizer
+== Proof Tool: Log-Sum-Exp Potential
 
-#compact[
-  The framework asks the next regularizer to absorb the one-step regret:
-
+#spacious[
+  Use the normalizing potential
   $
-    psi^*_(t+1)(theta_t - eta z_t)
-      <=
-    psi^*_t(theta_t - eta m_t)
-      - eta w_t^top (z_t - m_t).
+    L(beta) := log(sum_i exp(beta_i)).
   $
 
-  #v(0.4em)
+  #v(0.75em)
 
-  If this holds, the regret telescopes to
+  The weights are just the normalized exponential scores:
   $
-    "Regret"(u) <= (psi^*_1(theta_1) + psi_(T+1)(u)) / eta.
+    w_i(beta) =
+      exp(beta_i) / (sum_j exp(beta_j)).
   $
 
-  #v(0.35em)
+  #v(0.75em)
 
-  The correction term is chosen to make this inequality true.
+  So the proof can be read as a statement about how $L(beta)$ changes under
+  exponentiated updates.
 ]
 
-== Why the Correction Has This Shape
+== Why the Correction Works
 
-#compact[
-  With entropy regularization,
+#spacious[
+  The proof asks the correction to make
   $
-    psi^*(beta) = log(sum_i exp(beta_i)).
+    L(beta_t - eta z_t - eta^2 a_t)
+      <= L(beta_t - eta m_t)
+        - eta w_t^top (z_t - m_t).
   $
 
-  #v(0.35em)
+  #v(0.75em)
 
-  Put $a_(t,i) = (z_(t,i) - m_(t,i))^2$.
-  The key scalar inequality is
+  With $a_(t,i)=(z_(t,i)-m_(t,i))^2$, the scalar input is
   $
     exp(-x - x^2) <= 1 - x
     quad (abs(x) <= 1/2).
   $
 
-  #v(0.35em)
+  #v(0.75em)
 
-  Therefore
-  $
-    psi^*(beta_t - eta z_t - eta^2 a_t)
-      <= psi^*(beta_t - eta m_t)
-        - eta w_t^top (z_t - m_t).
-  $
+  Then the potential differences telescope into the stated regret bound.
 ]
 
-== One Template, Different Hints
+== Matrix Extension
 
-#compact[
-  The same theorem gives different bounds by changing the hint:
+#spacious[
+  The paper writes the general version in mirror-descent language, using a
+  Fenchel-conjugate potential.
 
-  #v(0.35em)
+  #v(0.55em)
 
-  #grid(
-    columns: (1fr, 1fr, 1fr),
-    column-gutter: 0.8em,
-    row-gutter: 0.42em,
-    align: (left + top, left + top, left + top),
-    [*Hint*], [*Error term*], [*Bound scale*],
-    [$m_t = 0$], [$z_t$], [$S_(i^star)$],
-    [$m_t = 1/t sum_(s<t) z_s$], [$z_t - m_t$], [$V_(i^star)$],
-    [$m_t = z_(t-1)$], [$z_t - z_(t-1)$], [$D_(i^star)$],
-  )
-
-  #v(0.35em)
-
-  The algorithmic template is one theorem; the hint chooses the notion of
-  predictability.
-]
-
-// ============================================================
-//  Significance
-// ============================================================
-= Significance
-
-== What the Paper Contributes
-
-#compact[
-  - Explains MW2 through adaptive regularizers.
-  - Combines adaptive regularization with optimistic learning.
-  - Resolves Kale's open problem: a path-length bound for the best expert.
-  - Extends the idea to matrix exponentiated gradient.
-
-  #v(0.45em)
-
-  Limitation: adaptive tuning of $eta$ weakens the clean $D_(i^star)$ statement.
-]
-
-== Matrix-Valued Losses: One-Slide Extension
-
-#compact[
   Replace distributions by density matrices:
   $
-    W_t in cal(S)_+^n, quad "tr"(W_t) = 1,
+    W_t in cal(S)_+^n, quad "tr"(W_t)=1,
     quad "loss" = "tr"(W_t Z_t).
   $
 
-  #v(0.3em)
+  #v(0.55em)
 
-  The update becomes
+  The analogous update is
   $
     B_(t+1) = B_t - eta Z_t - eta^2 (Z_t - M_t)^2,
     quad
-    W_t = exp(B_t - eta M_t) / "tr"(exp(B_t - eta M_t)).
+    W_t = exp(B_t - eta M_t) / ("tr"(exp(B_t - eta M_t))).
   $
 
-  #v(0.3em)
+  #v(0.55em)
 
-  With $M_t = Z_(t-1)$:
+  The noncommutative step uses Golden--Thompson:
   $
-    "Regret"(U)
-      <= (log n) / eta
-        + eta sum_t "tr"(U (Z_t - Z_(t-1))^2).
+    "tr"(exp(A+B)) <= "tr"(exp(A) exp(B)).
   $
-
-  New proof ingredient: Golden--Thompson plus FTRL-K for cone-ordered losses.
-]
-
-== Reference
-
-#compact[
-  Jacob Steinhardt and Percy Liang.
-  *Adaptivity and Optimism: An Improved Exponentiated Gradient Algorithm.*
-  Proceedings of the 31st International Conference on Machine Learning,
-  PMLR 32(1), 2014.
-
-  #v(0.45em)
-
-  Main takeaway:
-
-  #align(center)[
-    #text(size: 1.16em, weight: "bold", fill: m-light-brown)[
-      adaptive correction + optimistic hint = best-expert path-length regret
-    ]
-  ]
 ]
 
 // ============================================================
@@ -494,7 +595,7 @@
 
 == Backup: Optimizing the Path Bound
 
-#compact[
+#spacious[
   From
   $
     "Regret"(i^star) <= (log n) / eta + eta D_(i^star),
@@ -504,10 +605,14 @@
     eta = sqrt((log n) / D_(i^star)).
   $
 
+  #v(0.45em)
+
   When this satisfies $eta <= 1/4$,
   $
     "Regret"(i^star) <= 2 sqrt(D_(i^star) log n).
   $
+
+  #v(0.45em)
 
   If $D_(i^star)$ is unknown, adaptive tuning is possible but the paper's clean
   bound becomes weaker.
