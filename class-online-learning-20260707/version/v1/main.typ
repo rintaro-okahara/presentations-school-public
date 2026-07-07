@@ -332,38 +332,7 @@
 ]
 
 // ============================================================
-//  2. Paper motivation
-// ============================================================
-= Combining Two Directions
-
-== Paper's Motivation: Combine Them
-
-#spacious[
-  The paper's key move:
-
-  #v(0.55em)
-
-  #align(center)[
-    #text(size: 1.22em, weight: "bold", fill: m-light-brown)[
-      adaptive best-expert scale + optimistic hint error
-    ]
-  ]
-
-  #v(0.85em)
-
-  Desired second term:
-  $
-    sum_t (z_(t,i^star) - m_(t,i^star))^2 .
-  $
-
-  #v(0.75em)
-
-  This yields one algorithm whose guarantee becomes variance or path length
-  after choosing the hint sequence.
-]
-
-// ============================================================
-//  3. Main result
+//  2. Main result
 // ============================================================
 = Main Result
 
@@ -385,16 +354,25 @@
       column-gutter: 0.45em,
       row-gutter: alg-row-gutter,
       align: (right + horizon, left + horizon),
-      [1:], [Initialize $beta_(1,i) = 0$.],
-      [2:], [For $t=1,dots.c,T$, using hint $m_t$, form
-        #text(size: 1.04em)[
-          $p_(t,i) prop exp(beta_(t,i) #text(fill: m-red)[$-eta m_(t,i)$])$
-        ];
+      [1:], [Initialize weights $w_(1,i) = 1$ for all $i$.],
+      [2:], [
+        For $t=1,dots.c,T$, using hint $m_t$, form
+        #v(0.08em)
+        #align(center)[
+          #text(size: 0.92em)[
+            $p_(t,i) =
+              (w_(t,i) exp(#text(fill: m-red)[$-eta m_(t,i)$]))
+              / (sum_(j=1)^n w_(t,j) exp(#text(fill: m-red)[$-eta m_(t,j)$]))$
+          ]
+        ]
         learner plays $p_t$.],
       [3:], [Loss vector $z_t in [-1,1]^n$ is revealed; learner suffers $p_t^top z_t$.],
-      [4:], [For each $i$, update
-        $beta_(t+1,i)=beta_(t,i)-eta z_(t,i)$
-        #changed[$- eta^2 (z_(t,i)-m_(t,i))^2$].],
+      [4:], [
+        For each $i$, update
+        #text(size: 0.98em)[
+          $w_(t+1,i)=w_(t,i) exp(-eta z_(t,i) #text(fill: m-red)[$-eta^2 (z_(t,i)-m_(t,i))^2$])$.
+        ]
+      ],
     )
     v(0.1em)
     line(length: 100%, stroke: 1pt)
@@ -402,7 +380,8 @@
 
   #v(0.35em)
 
-  The red correction downweights experts whose hints were inaccurate.
+  The red terms use the hint in prediction and penalize inaccurate hints in
+  the update.
 ]
 
 == Upper Bound
@@ -423,197 +402,171 @@
   This is exactly the desired combination:
   the comparator chooses the relevant coordinates,
   and the hint error chooses the relevant scale.
-]
 
-== Path-Length Result
+  #v(0.55em)
 
-#spacious[
-  Set $m_t = z_(t-1)$ and take $u=e_(i^star)$:
-  $
-    "Regret"(i^star)
-      <= (log n) / eta + eta D_(i^star),
-      quad
-      D_i := sum_t (z_(t,i) - z_(t-1,i))^2.
-  $
-
-  #v(0.85em)
-
-  This answers Kale's question: can the path-length bound depend on the best
-  expert rather than the worst coordinate?
+  The step-size condition is for the proof inequality. Since
+  $abs(z_(t,i) - m_(t,i)) <= 2$, $eta <= 1/4$ gives
+  $abs(eta (z_(t,i) - m_(t,i))) <= 1/2$, so
+  $exp(-x - x^2) <= 1 - x$ applies.
 ]
 
 // ============================================================
-//  4. Hint interpretations
+//  3. Hint interpretations
 // ============================================================
 = What the Hints Mean
 
-== Three Choices of Hint
-
-#spacious[
-  The same upper bound has different interpretations:
-
-  #v(0.65em)
-
-  #grid(
-    columns: (1fr, 1fr, 1fr),
-    column-gutter: 0.75em,
-    row-gutter: 0.62em,
-    align: (left + top, left + top, left + top),
-    [*Hint*], [*Error term*], [*Regret scale*],
-    [$m_t = 0$], [$z_t$], [$S_(i^star)$],
-    [$m_t = 1/t sum_(s<t) z_s$], [$z_t - m_t$], [$V_(i^star)$],
-    [$m_t = z_(t-1)$], [$z_t - z_(t-1)$], [$D_(i^star)$],
-  )
-
-  #v(0.75em)
-
-  The paper uses this to unify second-moment, variance, and path-length bounds.
-]
-
-== When Is Regret Small?
-
-#spacious[
-  #show list: set block(spacing: 0.62em)
-
-  - $S_(i^star)$ is small when the best expert's losses are close to zero.
-  - $V_(i^star)$ is small when the best expert's losses are nearly constant.
-  - $D_(i^star)$ is small when the best expert's losses move slowly.
-
-  #v(0.9em)
-
-  The path-length view is strongest when the best expert may have large losses,
-  but those losses are predictable from the previous round.
-]
-
-== Comparison of Bounds
+== Hint Choices: Path-Length and Variance
 
 #[
-  #set text(size: 0.94em)
+  #set text(size: 0.73em)
+  The second term is the hint error
+  $H_i(m) := sum_t (z_(t,i) - m_(t,i))^2$.
+  Different hints make $H_i(m)$ small under different patterns.
+
+  #v(0.24em)
+
   #grid(
-    columns: (1.18fr, 1.03fr, 1.18fr),
-    column-gutter: 0.65em,
-    row-gutter: 0.58em,
-    align: (left + top, left + top, left + top),
-    [*Algorithm*], [*Scale in bound*], [*What it misses*],
-    [EG / Hedge], [$S_oo$], [best expert may be easy],
-    [Cesa-Bianchi et al.], [$S_(i^star)$], [no variance/path adaptivity],
-    [Hazan--Kale], [$max_i V_i$], [depends on all experts],
-    [Chiang et al.], [$D_oo$], [depends on worst movement],
-    [*AEG-Path*], [$D_(i^star)$], [best expert only],
+    columns: (1fr, 1fr),
+    gutter: 1.5em,
+    align: (left + top, left + top),
+    [
+      *Last-loss hint*
+
+      #v(0.12em)
+
+      $m_t = z_(t-1)$
+
+      #v(0.18em)
+
+      *Controls:* path length of expert $i$:
+      $
+        D_i := sum_t (z_(t,i) - z_(t-1,i))^2 .
+      $
+
+      #v(0.14em)
+
+      Here $H_i(m)=D_i$, so
+
+      #v(0.08em)
+
+      $
+        "Regret"(i^star)
+          <= (log n) / eta + eta D_(i^star).
+      $
+
+      #v(0.14em)
+
+      *Interpretation:* good when the best expert changes slowly from one round
+      to the next.
+    ],
+    [
+      *Past-average hint*
+
+      #v(0.12em)
+
+      $m_t = 1/t sum_(s=1)^(t-1) z_s$
+
+      #v(0.18em)
+
+      *Controls:* variance around a stable mean:
+      $
+        V_i := sum_t (z_(t,i) - mu_i)^2,
+        quad
+        mu_i := 1/T sum_t z_(t,i).
+      $
+
+      #v(0.14em)
+
+      Paper's lemma:
+      $
+        sum_t (z_(t,i) - m_(t,i))^2 <= 2 V_i + 6.
+      $
+
+      #v(0.08em)
+
+      $
+        "Regret"(i^star)
+          <= (log n) / eta + eta (2 V_(i^star) + 6).
+      $
+
+      #v(0.14em)
+
+      *Good when:* the best expert's losses stay near one fixed average,
+      even with noise.
+    ],
   )
-
-  #v(0.75em)
-
-  Even if $D_(i^star)=Theta(1)$, the other scales can be $Theta(T)$.
 ]
 
 // ============================================================
-//  5. Proof tools and extensions
+//  4. Proof tools and extensions
 // ============================================================
 = Proof Tools and Extensions
 
-== Proof Tool: Log-Sum-Exp Potential
+== Proof Tool: Fenchel Conjugate
 
 #spacious[
-  Use the normalizing potential
+  The paper writes EG through the Fenchel conjugate of negative entropy:
   $
-    L(beta) := log(sum_i exp(beta_i)).
+    psi(w) = sum_i w_i log w_i,
+    quad
+    psi^*(beta) = log(sum_i exp(beta_i)).
   $
 
-  #v(0.75em)
+  #v(0.65em)
 
-  The weights are just the normalized exponential scores:
+  The conjugate turns scores into probabilities:
   $
-    w_i(beta) =
+    nabla psi^*(beta)_i =
       exp(beta_i) / (sum_j exp(beta_j)).
   $
 
-  #v(0.75em)
+  #v(0.65em)
 
-  So the proof can be read as a statement about how $L(beta)$ changes under
-  exponentiated updates.
-]
-
-== Why the Correction Works
-
-#spacious[
-  The proof asks the correction to make
+  So the algorithm can be written as
   $
-    L(beta_t - eta z_t - eta^2 a_t)
-      <= L(beta_t - eta m_t)
-        - eta w_t^top (z_t - m_t).
+    p_t = nabla psi^*(beta_t - eta m_t),
   $
+  and the proof tracks how $psi^*$ changes after each update.
 
-  #v(0.75em)
-
-  With $a_(t,i)=(z_(t,i)-m_(t,i))^2$, the scalar input is
-  $
-    exp(-x - x^2) <= 1 - x
-    quad (abs(x) <= 1/2).
-  $
-
-  #v(0.75em)
-
-  Then the potential differences telescope into the stated regret bound.
+  #v(0.45em)
 ]
 
 == Matrix Extension
 
-#spacious[
-  The paper writes the general version in mirror-descent language, using a
-  Fenchel-conjugate potential.
+#[
+  #set text(size: 0.9em)
 
-  #v(0.55em)
-
-  Replace distributions by density matrices:
+  Replace distributions by density matrices and losses by symmetric matrices:
   $
-    W_t in cal(S)_+^n, quad "tr"(W_t)=1,
-    quad "loss" = "tr"(W_t Z_t).
-  $
-
-  #v(0.55em)
-
-  The analogous update is
-  $
-    B_(t+1) = B_t - eta Z_t - eta^2 (Z_t - M_t)^2,
-    quad
-    W_t = exp(B_t - eta M_t) / ("tr"(exp(B_t - eta M_t))).
+    W_t, U in cal(S)_+^n,
+    quad "tr"(W_t)="tr"(U)=1,
+    quad ell_t(W_t)="tr"(W_t Z_t),
+    quad norm(Z_t)_"op" <= 1.
   $
 
-  #v(0.55em)
+  #v(0.4em)
 
-  The noncommutative step uses Golden--Thompson:
+  Matrix regret is measured against a fixed density matrix $U$:
   $
-    "tr"(exp(A+B)) <= "tr"(exp(A) exp(B)).
-  $
-]
-
-// ============================================================
-//  Backup
-// ============================================================
-= Backup <touying:hidden>
-
-== Backup: Optimizing the Path Bound
-
-#spacious[
-  From
-  $
-    "Regret"(i^star) <= (log n) / eta + eta D_(i^star),
-  $
-  the best fixed step size is
-  $
-    eta = sqrt((log n) / D_(i^star)).
+    "Regret"(U) := sum_t "tr"((W_t - U) Z_t).
   $
 
   #v(0.45em)
 
-  When this satisfies $eta <= 1/4$,
+  *General hint version* (Proposition 4.1):
   $
-    "Regret"(i^star) <= 2 sqrt(D_(i^star) log n).
+    "Regret"(U)
+      <= (log n) / eta
+        + eta sum_t "tr"(U (Z_t - M_t)^2).
   $
 
   #v(0.45em)
 
-  If $D_(i^star)$ is unknown, adaptive tuning is possible but the paper's clean
-  bound becomes weaker.
+  *Path-length hint:* with $M_t=Z_(t-1)$,
+  $
+    "Regret"(U)
+      <= (log n) / eta
+        + eta sum_t "tr"(U (Z_t - Z_(t-1))^2).
+  $
 ]
